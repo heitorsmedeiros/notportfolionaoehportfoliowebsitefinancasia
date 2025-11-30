@@ -17,6 +17,10 @@
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* Ajuste para input date/month ficar bonito */
+        input[type="month"] {
+            min-width: 150px;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -24,14 +28,13 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         // --- Ícones (SVG Inline corrigidos com Fragments <>) ---
         const Icon = ({ name, size = 16, className = "" }) => {
             const icons = {
                 plus: <path d="M5 12h14M12 5v14" />,
                 trash: <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />,
-                // Elementos agrupados com <>...</> para evitar erro de sintaxe JSX
                 card: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>,
                 download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />,
                 upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
@@ -40,7 +43,9 @@
                 trending: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
                 alert: <><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></>,
                 calc: <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M16 14v4M8 14v4M12 14v4M8 10h8" /></>,
-                json: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>
+                json: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
+                check: <polyline points="20 6 9 17 4 12" />,
+                clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>
             };
 
             return (
@@ -73,6 +78,11 @@
                 }
             };
 
+            // Helpers de Data
+            const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7); // YYYY-MM
+            
+            const [viewDate, setViewDate] = useState(getCurrentMonthStr()); // Estado para "Mês de Referência"
+
             const [income, setIncome] = useState(() => loadInitialState('fin_income', 1000));
             
             const [fixedExpenses, setFixedExpenses] = useState(() => loadInitialState('fin_fixed', [
@@ -101,23 +111,61 @@
             const [newCardExpenseValue, setNewCardExpenseValue] = useState('');
             const [newCardInstallments, setNewCardInstallments] = useState(1);
             const [selectedCard, setSelectedCard] = useState('Nubank');
+            const [newCardDate, setNewCardDate] = useState(getCurrentMonthStr()); // Data da compra
 
             const fileInputRef = useRef(null);
 
-            // Helpers
+            // Helpers de Formatação
             const formatCurrency = (value) => {
                 return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
             };
 
-            // Cálculos
-            const totalFixed = fixedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
-            
-            const totalCardBill = cardExpenses.reduce((acc, curr) => {
-                return acc + (curr.totalValue / curr.installments);
-            }, 0);
+            const formatMonthYear = (dateStr) => {
+                const [year, month] = dateStr.split('-');
+                const date = new Date(parseInt(year), parseInt(month) - 1);
+                return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            };
 
-            const totalExpenses = totalFixed + totalCardBill;
-            const balance = income - totalExpenses;
+            // LÓGICA DE CÁLCULO DE PARCELAS RETROATIVAS
+            const getInstallmentInfo = (expense, currentViewDate) => {
+                // Se a despesa não tem data (legado), assume que começou no mês atual da criação
+                const startDateStr = expense.firstInstallment || getCurrentMonthStr();
+                
+                const [startYear, startMonth] = startDateStr.split('-').map(Number);
+                const [viewYear, viewMonth] = currentViewDate.split('-').map(Number);
+
+                // Diferença em meses
+                const diffMonths = (viewYear - startYear) * 12 + (viewMonth - startMonth);
+                const currentInstallment = diffMonths + 1;
+
+                if (currentInstallment > 0 && currentInstallment <= expense.installments) {
+                    return { status: 'active', current: currentInstallment, label: `${currentInstallment}/${expense.installments}` };
+                } else if (currentInstallment > expense.installments) {
+                    return { status: 'paid', current: currentInstallment, label: 'Pago' };
+                } else {
+                    return { status: 'future', current: currentInstallment, label: 'Futuro' };
+                }
+            };
+
+            // Cálculos Totais (Memoizados para performance)
+            const { totalFixed, totalCardBill, totalExpenses, balance } = useMemo(() => {
+                const fixed = fixedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+                
+                // Soma apenas as parcelas ATIVAS no mês de visualização (viewDate)
+                const cardBill = cardExpenses.reduce((acc, curr) => {
+                    const info = getInstallmentInfo(curr, viewDate);
+                    if (info.status === 'active') {
+                        return acc + (curr.totalValue / curr.installments);
+                    }
+                    return acc;
+                }, 0);
+
+                const totalExp = fixed + cardBill;
+                const bal = income - totalExp;
+
+                return { totalFixed: fixed, totalCardBill: cardBill, totalExpenses: totalExp, balance: bal };
+            }, [fixedExpenses, cardExpenses, viewDate, income]);
+
             const balanceColor = balance >= 0 ? 'text-green-600' : 'text-red-600';
 
             const previewInstallment = newCardExpenseValue && newCardInstallments 
@@ -148,10 +196,13 @@
                     card: selectedCard,
                     totalValue: parseFloat(newCardExpenseValue.replace(',', '.')),
                     installments: parseInt(newCardInstallments) || 1,
+                    firstInstallment: newCardDate // Salva a data de início!
                 }]);
+                // Reset form
                 setNewCardExpenseDesc('');
                 setNewCardExpenseValue('');
                 setNewCardInstallments(1);
+                // Não reseta a data para facilitar lançamentos em lote do mesmo mês
             };
 
             const removeCardExpense = (id) => {
@@ -192,30 +243,31 @@
                 event.target.value = '';
             };
 
-            // Exportar CSV
             const exportToCSV = () => {
                 let csvContent = "data:text/csv;charset=utf-8,";
-                csvContent += "Tipo,Descricao,Valor Total,Parcelas,Valor Mensal\n";
-                csvContent += `Entrada,Salário Líquido,${income.toFixed(2).replace('.', ',')},-,${income.toFixed(2).replace('.', ',')}\n`;
+                csvContent += `Relatório referente a: ${formatMonthYear(viewDate)}\n\n`;
+                csvContent += "Tipo,Descricao,Status,Valor Parcela (Mês Atual)\n";
+                csvContent += `Entrada,Salário Líquido,-,${income.toFixed(2).replace('.', ',')}\n`;
                 
                 fixedExpenses.forEach(item => {
-                    csvContent += `Fixa,${item.name},${item.amount.toFixed(2).replace('.', ',')},Mensal,${item.amount.toFixed(2).replace('.', ',')}\n`;
+                    csvContent += `Fixa,${item.name},Ativo,${item.amount.toFixed(2).replace('.', ',')}\n`;
                 });
 
                 cardExpenses.forEach(item => {
-                    const monthly = (item.totalValue / item.installments).toFixed(2).replace('.', ',');
-                    const total = item.totalValue.toFixed(2).replace('.', ',');
-                    csvContent += `Cartão (${item.card}),${item.description},${total},${item.installments}x,${monthly}\n`;
+                    const info = getInstallmentInfo(item, viewDate);
+                    if (info.status === 'active') {
+                        const monthly = (item.totalValue / item.installments).toFixed(2).replace('.', ',');
+                        csvContent += `Cartão (${item.card}),${item.description},Parcela ${info.label},${monthly}\n`;
+                    }
                 });
 
-                csvContent += `\nRESUMO,,,,, \n`;
-                csvContent += `Total Receitas,,,,${income.toFixed(2).replace('.', ',')}\n`;
-                csvContent += `Total Despesas,,,,${totalExpenses.toFixed(2).replace('.', ',')}\n`;
-                csvContent += `Saldo Final,,,,${balance.toFixed(2).replace('.', ',')}\n`;
+                csvContent += `\nRESUMO,,,\n`;
+                csvContent += `Total Despesas,,,${totalExpenses.toFixed(2).replace('.', ',')}\n`;
+                csvContent += `Saldo Final,,,${balance.toFixed(2).replace('.', ',')}\n`;
 
                 const link = document.createElement("a");
                 link.setAttribute("href", encodeURI(csvContent));
-                link.setAttribute("download", "planilha_financeira.csv");
+                link.setAttribute("download", `financeiro_${viewDate}.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -224,57 +276,59 @@
             return (
                 <div className="max-w-5xl mx-auto p-4 min-h-screen font-sans">
                     
-                    {/* Header */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border-b-4 border-indigo-600 mb-6">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    {/* Top Bar: Data de Referência */}
+                    <div className="bg-slate-800 text-white p-4 rounded-t-lg shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
+                         <div className="flex items-center gap-3">
+                            <div className="bg-indigo-500 p-2 rounded-lg">
+                                <Icon name="calendar" size={24} />
+                            </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-slate-800">Controle Financeiro</h1>
-                                <p className="text-sm text-slate-500">Versão Web (Dados salvos no navegador)</p>
+                                <p className="text-xs text-slate-300 uppercase tracking-wider font-semibold">Visualizando Mês de</p>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="month" 
+                                        value={viewDate} 
+                                        onChange={(e) => setViewDate(e.target.value)} 
+                                        className="bg-transparent text-xl font-bold focus:outline-none border-b border-dashed border-slate-500 hover:border-white transition-colors cursor-pointer"
+                                    />
+                                </div>
                             </div>
-                            
-                            <div className="flex flex-wrap gap-2 justify-center">
-                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json" className="hidden" />
-                                
-                                <button onClick={triggerImport} className="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors">
-                                    <Icon name="upload" size={14} /> Carregar Backup
-                                </button>
-                                <button onClick={exportBackup} className="flex items-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors">
-                                    <Icon name="json" size={14} /> Salvar Backup
-                                </button>
-                                <button onClick={exportToCSV} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors">
-                                    <Icon name="download" size={14} /> Excel (.csv)
-                                </button>
-                            </div>
-                        </div>
+                         </div>
+                         <div className="flex gap-2">
+                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json" className="hidden" />
+                            <button onClick={triggerImport} className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-2"><Icon name="upload" size={14}/> Carregar</button>
+                            <button onClick={exportBackup} className="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-2"><Icon name="json" size={14}/> Salvar</button>
+                            <button onClick={exportToCSV} className="bg-green-600 hover:bg-green-500 px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-2"><Icon name="download" size={14}/> CSV</button>
+                         </div>
                     </div>
 
                     {/* Cards Resumo */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-                            <div className="flex items-center gap-2 mb-2 text-slate-500">
-                                <Icon name="dollar" size={18} /> <span className="text-sm font-medium">Salário Líquido</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-white p-4 rounded-b-lg shadow-sm border-x border-b border-slate-200">
+                        <div className="p-4 bg-slate-50 rounded border border-slate-100">
+                            <div className="flex items-center gap-2 mb-1 text-slate-500">
+                                <Icon name="dollar" size={16} /> <span className="text-xs font-bold uppercase">Salário</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-2xl font-bold text-slate-700">R$</span>
-                                <input type="number" value={income} onChange={(e) => setIncome(Number(e.target.value))} className="text-2xl font-bold text-slate-800 w-full bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500" />
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-                            <div className="flex items-center gap-2 mb-2 text-slate-500">
-                                <Icon name="trending" size={18} /> <span className="text-sm font-medium">Total Comprometido</span>
-                            </div>
-                            <p className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
-                            <div className="flex gap-2 text-xs mt-1 text-slate-400">
-                                <span>Fixas: {formatCurrency(totalFixed)}</span><span>+</span><span>Cartões: {formatCurrency(totalCardBill)}</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-xl font-bold text-slate-700">R$</span>
+                                <input type="number" value={income} onChange={(e) => setIncome(Number(e.target.value))} className="text-xl font-bold text-slate-800 w-full bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500" />
                             </div>
                         </div>
 
-                        <div className={`bg-white p-5 rounded-lg shadow-sm border border-slate-200 ${balance < 0 ? 'bg-red-50 border-red-100' : ''}`}>
-                            <div className="flex items-center gap-2 mb-2 text-slate-500">
-                                <Icon name="alert" size={18} /> <span className="text-sm font-medium">Sobra Livre</span>
+                        <div className="p-4 bg-slate-50 rounded border border-slate-100">
+                            <div className="flex items-center gap-2 mb-1 text-slate-500">
+                                <Icon name="trending" size={16} /> <span className="text-xs font-bold uppercase">Comprometido ({formatMonthYear(viewDate)})</span>
                             </div>
-                            <p className={`text-2xl font-bold ${balanceColor}`}>{formatCurrency(balance)}</p>
+                            <p className="text-xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
+                            <div className="flex gap-2 text-[10px] mt-1 text-slate-400">
+                                <span>Fixas: {formatCurrency(totalFixed)}</span><span>+</span><span>Faturas: {formatCurrency(totalCardBill)}</span>
+                            </div>
+                        </div>
+
+                        <div className={`p-4 rounded border border-slate-100 ${balance < 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                            <div className="flex items-center gap-2 mb-1 text-slate-500">
+                                <Icon name="alert" size={16} /> <span className="text-xs font-bold uppercase">Sobra Livre</span>
+                            </div>
+                            <p className={`text-xl font-bold ${balanceColor}`}>{formatCurrency(balance)}</p>
                         </div>
                     </div>
 
@@ -284,9 +338,9 @@
                         {/* Fixas */}
                         <div className="lg:col-span-4 bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col">
                             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
-                                <Icon name="calendar" size={20} className="text-indigo-600" /> Fixas & Assinaturas
+                                <Icon name="check" size={20} className="text-indigo-600" /> Fixas
                             </h2>
-                            <div className="flex-grow space-y-3 mb-4 max-h-[500px] overflow-y-auto">
+                            <div className="flex-grow space-y-3 mb-4 max-h-[400px] overflow-y-auto">
                                 {fixedExpenses.map(expense => (
                                     <div key={expense.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100 hover:border-slate-300 transition-colors">
                                         <span className="text-slate-700 font-medium text-sm">{expense.name}</span>
@@ -297,13 +351,10 @@
                                     </div>
                                 ))}
                             </div>
-                            <div className="pt-3 border-t flex justify-between font-bold text-slate-700 mb-4 bg-slate-50 p-2 rounded">
-                                <span>Total Fixo</span><span>{formatCurrency(totalFixed)}</span>
-                            </div>
                             <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100 mt-auto">
-                                <p className="text-[10px] font-bold text-indigo-700 mb-2 uppercase">Adicionar Nova</p>
+                                <p className="text-[10px] font-bold text-indigo-700 mb-2 uppercase">Nova Fixa</p>
                                 <div className="flex flex-col gap-2">
-                                    <input type="text" placeholder="Nome (ex: Internet)" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    <input type="text" placeholder="Nome" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                     <div className="flex gap-2">
                                         <input type="number" placeholder="R$" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} className="flex-1 p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                         <button onClick={addFixedExpense} className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 w-10 flex items-center justify-center"><Icon name="plus" size={18} /></button>
@@ -315,16 +366,17 @@
                         {/* Cartões */}
                         <div className="lg:col-span-8 bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col">
                             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
-                                <Icon name="card" size={20} className="text-purple-600" /> Compras Parceladas
+                                <Icon name="card" size={20} className="text-purple-600" /> Parcelamentos
                             </h2>
                             
+                            {/* Simulador */}
                             <div className="bg-gradient-to-r from-purple-50 to-white p-4 rounded-xl border border-purple-100 mb-6 shadow-sm">
                                 <p className="text-xs font-bold text-purple-700 mb-3 uppercase flex items-center gap-1">
-                                    <Icon name="calc" size={14} /> Simular Compra
+                                    <Icon name="calc" size={14} /> Adicionar Compra (Retroativa ou Nova)
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                                     <div className="md:col-span-2">
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">DESCRIÇÃO</label>
+                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">DESCRIÇÃO & CARTÃO</label>
                                         <div className="flex gap-2">
                                             <select value={selectedCard} onChange={(e) => setSelectedCard(e.target.value)} className="w-1/3 p-2 text-sm border border-purple-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                                                 <option value="Nubank">Nubank</option><option value="Bradescard">Amazon</option><option value="Santander">Santander</option>
@@ -333,52 +385,82 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">TOTAL</label>
+                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">VALOR TOTAL</label>
                                         <input type="number" placeholder="0,00" value={newCardExpenseValue} onChange={(e) => setNewCardExpenseValue(e.target.value)} className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-slate-500 ml-1 font-bold">PARCELAS</label>
                                         <input type="number" placeholder="1" value={newCardInstallments} onChange={(e) => setNewCardInstallments(e.target.value)} className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
                                     </div>
-                                </div>
-                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-purple-100">
-                                    <div className="flex items-baseline gap-2">
-                                        <p className="text-xs text-purple-800">Será adicionado ao mês:</p>
-                                        <p className="text-lg font-bold text-purple-700">{formatCurrency(previewInstallment)}</p>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">MÊS DA 1ª PARCELA</label>
+                                        <input 
+                                            type="month" 
+                                            value={newCardDate} 
+                                            onChange={(e) => setNewCardDate(e.target.value)} 
+                                            className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" 
+                                        />
+                                        <span className="text-[10px] text-slate-400">Para retroativo, selecione um mês passado.</span>
                                     </div>
-                                    <button onClick={addCardExpense} className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 shadow-sm font-medium transition-colors text-sm flex items-center gap-2"><Icon name="plus" size={16} /> Adicionar</button>
+                                    <div className="md:col-span-2 flex items-end justify-between">
+                                         <div className="mb-2">
+                                            <p className="text-xs text-purple-800">Mensal:</p>
+                                            <p className="text-lg font-bold text-purple-700">{formatCurrency(previewInstallment)}</p>
+                                         </div>
+                                         <button onClick={addCardExpense} className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 shadow-sm font-medium transition-colors text-sm flex items-center gap-2 h-10 mb-1"><Icon name="plus" size={16} /> Adicionar</button>
+                                    </div>
                                 </div>
                             </div>
 
+                            {/* Lista Inteligente */}
                             <div className="flex-grow space-y-2">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Compras Ativas</h3>
-                                    <span className="text-xs text-slate-400">{cardExpenses.length} itens</span>
+                                <div className="flex justify-between items-center mb-2 px-1">
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Situação em {formatMonthYear(viewDate)}</h3>
+                                    <span className="text-xs text-slate-400">{cardExpenses.length} cadastrados</span>
                                 </div>
                                 {cardExpenses.length === 0 ? (
-                                    <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-lg"><p className="text-sm text-slate-400">Nenhuma compra parcelada.</p></div>
+                                    <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-lg"><p className="text-sm text-slate-400">Nenhuma compra cadastrada.</p></div>
                                 ) : (
                                     cardExpenses.slice().reverse().map(expense => {
                                         const installmentValue = expense.totalValue / expense.installments;
+                                        const info = getInstallmentInfo(expense, viewDate);
+                                        
+                                        // Define estilo baseado no status (Ativo = Forte, Pago/Futuro = Opaco)
+                                        const opacityClass = info.status === 'active' ? 'opacity-100 border-purple-200 bg-white shadow-sm' : 'opacity-60 bg-slate-50 border-slate-100 grayscale';
+                                        const statusBadgeColor = info.status === 'active' ? 'bg-green-100 text-green-700' : info.status === 'paid' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-700';
+
                                         return (
-                                            <div key={expense.id} className="p-3 bg-white rounded-md border border-slate-200 relative group shadow-sm hover:shadow-md transition-shadow">
+                                            <div key={expense.id} className={`p-3 rounded-md border relative group transition-all ${opacityClass}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-2 h-10 rounded-full ${expense.card === 'Nubank' ? 'bg-purple-500' : expense.card === 'Santander' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                                                        <div className={`w-1 h-10 rounded-full ${expense.card === 'Nubank' ? 'bg-purple-500' : expense.card === 'Santander' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-slate-800 font-bold">{expense.description}</span>
+                                                                <span className="text-slate-800 font-bold text-sm">{expense.description}</span>
                                                                 <span className="text-[10px] uppercase text-slate-400 border px-1 rounded">{expense.card}</span>
                                                             </div>
-                                                            <span className="text-xs text-slate-500">Total: {formatCurrency(expense.totalValue)} em {expense.installments}x</span>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${statusBadgeColor}`}>
+                                                                    {info.label}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400">
+                                                                    Total: {formatCurrency(expense.totalValue)}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="text-right pr-8">
-                                                        <span className="block font-bold text-red-600 text-lg">{formatCurrency(installmentValue)}</span>
-                                                        <span className="text-[10px] text-slate-400 block -mt-1">por mês</span>
+                                                        {info.status === 'active' ? (
+                                                            <>
+                                                                <span className="block font-bold text-red-600 text-base">{formatCurrency(installmentValue)}</span>
+                                                                <span className="text-[10px] text-slate-400 block -mt-1">neste mês</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400 font-medium italic">--</span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <button onClick={() => removeCardExpense(expense.id)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Icon name="trash" size={16} /></button>
+                                                <button onClick={() => removeCardExpense(expense.id)} className="absolute top-1/2 -translate-y-1/2 right-2 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Icon name="trash" size={14} /></button>
                                             </div>
                                         )
                                     })
