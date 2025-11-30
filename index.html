@@ -45,7 +45,8 @@
                 calc: <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M16 14v4M8 14v4M12 14v4M8 10h8" /></>,
                 json: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
                 check: <polyline points="20 6 9 17 4 12" />,
-                clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>
+                clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+                wallet: <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></>
             };
 
             return (
@@ -66,6 +67,18 @@
             );
         };
 
+        // --- Opções de Cores para Cartões ---
+        const CARD_COLORS = [
+            { name: 'Roxo', class: 'bg-purple-600', text: 'text-purple-600', border: 'border-purple-200', light: 'bg-purple-100' },
+            { name: 'Vermelho', class: 'bg-red-600', text: 'text-red-600', border: 'border-red-200', light: 'bg-red-100' },
+            { name: 'Azul', class: 'bg-blue-600', text: 'text-blue-600', border: 'border-blue-200', light: 'bg-blue-100' },
+            { name: 'Verde', class: 'bg-emerald-600', text: 'text-emerald-600', border: 'border-emerald-200', light: 'bg-emerald-100' },
+            { name: 'Laranja', class: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-200', light: 'bg-orange-100' },
+            { name: 'Preto', class: 'bg-slate-800', text: 'text-slate-800', border: 'border-slate-300', light: 'bg-slate-200' },
+            { name: 'Rosa', class: 'bg-pink-600', text: 'text-pink-600', border: 'border-pink-200', light: 'bg-pink-100' },
+            { name: 'Amarelo', class: 'bg-yellow-500', text: 'text-yellow-600', border: 'border-yellow-200', light: 'bg-yellow-100' },
+        ];
+
         // --- Componente Principal ---
         const FinancialManager = () => {
             // --- Estado Inicial ---
@@ -83,35 +96,38 @@
             
             const [viewDate, setViewDate] = useState(getCurrentMonthStr()); // Estado para "Mês de Referência"
 
-            const [income, setIncome] = useState(() => loadInitialState('fin_income', 1000));
-            
-            const [fixedExpenses, setFixedExpenses] = useState(() => loadInitialState('fin_fixed', [
-                { id: 1, name: 'Wellhub (Academia)', amount: 115.90 },
-                { id: 2, name: 'Youtube Premium', amount: 16.90 },
-                { id: 3, name: 'Meli+', amount: 9.90 },
-                { id: 4, name: 'Amazon Prime', amount: 19.90 },
-                { id: 5, name: 'Plano Celular', amount: 41.00 },
-                { id: 6, name: 'Aniversariantes Trabalho', amount: 12.50 },
-            ]));
+            // DADOS INICIAIS
+            // income agora é tratado como LÍQUIDO nos cálculos, mas mantemos o nome da variável para compatibilidade
+            const [income, setIncome] = useState(() => loadInitialState('fin_income', 0)); 
+            const [grossIncome, setGrossIncome] = useState(() => loadInitialState('fin_gross_income', 0)); // NOVO: Salário Bruto
 
+            const [fixedExpenses, setFixedExpenses] = useState(() => loadInitialState('fin_fixed', []));
             const [cardExpenses, setCardExpenses] = useState(() => loadInitialState('fin_cards', []));
+            const [cardsList, setCardsList] = useState(() => loadInitialState('fin_cards_list', []));
 
             // Persistência automática
             useEffect(() => {
                 localStorage.setItem('fin_income', JSON.stringify(income));
+                localStorage.setItem('fin_gross_income', JSON.stringify(grossIncome));
                 localStorage.setItem('fin_fixed', JSON.stringify(fixedExpenses));
                 localStorage.setItem('fin_cards', JSON.stringify(cardExpenses));
-            }, [income, fixedExpenses, cardExpenses]);
+                localStorage.setItem('fin_cards_list', JSON.stringify(cardsList));
+            }, [income, grossIncome, fixedExpenses, cardExpenses, cardsList]);
 
             // Formulários
             const [newExpenseName, setNewExpenseName] = useState('');
             const [newExpenseAmount, setNewExpenseAmount] = useState('');
             
+            // Formulário Cartões
+            const [newCardName, setNewCardName] = useState('');
+            const [newCardColor, setNewCardColor] = useState(CARD_COLORS[0].class); // Default Roxo
+
+            // Formulário Compras
             const [newCardExpenseDesc, setNewCardExpenseDesc] = useState('');
             const [newCardExpenseValue, setNewCardExpenseValue] = useState('');
             const [newCardInstallments, setNewCardInstallments] = useState(1);
-            const [selectedCard, setSelectedCard] = useState('Nubank');
-            const [newCardDate, setNewCardDate] = useState(getCurrentMonthStr()); // Data da compra
+            const [selectedCardId, setSelectedCardId] = useState(''); // ID do cartão selecionado
+            const [newCardDate, setNewCardDate] = useState(getCurrentMonthStr()); 
 
             const fileInputRef = useRef(null);
 
@@ -126,15 +142,28 @@
                 return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
             };
 
+            // Helper para pegar cor do cartão
+            const getCardColor = (cardId) => {
+                const card = cardsList.find(c => c.id.toString() === cardId.toString());
+                if (card) {
+                    const colorObj = CARD_COLORS.find(c => c.class === card.color) || CARD_COLORS[0];
+                    return colorObj;
+                }
+                return CARD_COLORS[0];
+            };
+            
+            const getCardName = (cardId) => {
+                const card = cardsList.find(c => c.id.toString() === cardId.toString());
+                return card ? card.name : 'Desconhecido';
+            };
+
             // LÓGICA DE CÁLCULO DE PARCELAS RETROATIVAS
             const getInstallmentInfo = (expense, currentViewDate) => {
-                // Se a despesa não tem data (legado), assume que começou no mês atual da criação
                 const startDateStr = expense.firstInstallment || getCurrentMonthStr();
                 
                 const [startYear, startMonth] = startDateStr.split('-').map(Number);
                 const [viewYear, viewMonth] = currentViewDate.split('-').map(Number);
 
-                // Diferença em meses
                 const diffMonths = (viewYear - startYear) * 12 + (viewMonth - startMonth);
                 const currentInstallment = diffMonths + 1;
 
@@ -147,11 +176,10 @@
                 }
             };
 
-            // Cálculos Totais (Memoizados para performance)
+            // Cálculos Totais
             const { totalFixed, totalCardBill, totalExpenses, balance } = useMemo(() => {
                 const fixed = fixedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
                 
-                // Soma apenas as parcelas ATIVAS no mês de visualização (viewDate)
                 const cardBill = cardExpenses.reduce((acc, curr) => {
                     const info = getInstallmentInfo(curr, viewDate);
                     if (info.status === 'active') {
@@ -161,7 +189,7 @@
                 }, 0);
 
                 const totalExp = fixed + cardBill;
-                const bal = income - totalExp;
+                const bal = income - totalExp; // Usa o LÍQUIDO para o saldo
 
                 return { totalFixed: fixed, totalCardBill: cardBill, totalExpenses: totalExp, balance: bal };
             }, [fixedExpenses, cardExpenses, viewDate, income]);
@@ -172,7 +200,29 @@
                 ? parseFloat(newCardExpenseValue.replace(',', '.')) / parseInt(newCardInstallments) 
                 : 0;
 
-            // Ações
+            // --- Ações ---
+
+            // Cartões
+            const addCard = () => {
+                if (!newCardName) return;
+                const newId = Date.now();
+                setCardsList([...cardsList, {
+                    id: newId,
+                    name: newCardName,
+                    color: newCardColor
+                }]);
+                setNewCardName('');
+                if (cardsList.length === 0) setSelectedCardId(newId);
+            };
+
+            const removeCard = (id) => {
+                if (confirm('Remover este cartão? Compras associadas não serão excluídas, mas ficarão sem categoria.')) {
+                    setCardsList(cardsList.filter(c => c.id !== id));
+                    if (selectedCardId === id) setSelectedCardId('');
+                }
+            };
+
+            // Fixas
             const addFixedExpense = () => {
                 if (!newExpenseName || !newExpenseAmount) return;
                 setFixedExpenses([...fixedExpenses, { 
@@ -188,21 +238,23 @@
                 setFixedExpenses(fixedExpenses.filter(item => item.id !== id));
             };
 
+            // Compras Cartão
             const addCardExpense = () => {
-                if (!newCardExpenseDesc || !newCardExpenseValue) return;
+                if (!newCardExpenseDesc || !newCardExpenseValue || !selectedCardId) {
+                    if (!selectedCardId) alert("Por favor, selecione ou cadastre um cartão primeiro.");
+                    return;
+                }
                 setCardExpenses([...cardExpenses, {
                     id: Date.now(), 
                     description: newCardExpenseDesc,
-                    card: selectedCard,
+                    cardId: selectedCardId,
                     totalValue: parseFloat(newCardExpenseValue.replace(',', '.')),
                     installments: parseInt(newCardInstallments) || 1,
-                    firstInstallment: newCardDate // Salva a data de início!
+                    firstInstallment: newCardDate
                 }]);
-                // Reset form
                 setNewCardExpenseDesc('');
                 setNewCardExpenseValue('');
                 setNewCardInstallments(1);
-                // Não reseta a data para facilitar lançamentos em lote do mesmo mês
             };
 
             const removeCardExpense = (id) => {
@@ -211,7 +263,14 @@
 
             // Backup JSON
             const exportBackup = () => {
-                const data = { income, fixedExpenses, cardExpenses, exportDate: new Date().toISOString() };
+                const data = { 
+                    income, 
+                    grossIncome, // Inclui Bruto
+                    fixedExpenses, 
+                    cardExpenses, 
+                    cardsList, 
+                    exportDate: new Date().toISOString() 
+                };
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -232,8 +291,10 @@
                     try {
                         const data = JSON.parse(e.target.result);
                         if (data.income !== undefined) setIncome(data.income);
+                        if (data.grossIncome !== undefined) setGrossIncome(data.grossIncome); // Lê Bruto
                         if (data.fixedExpenses) setFixedExpenses(data.fixedExpenses);
                         if (data.cardExpenses) setCardExpenses(data.cardExpenses);
+                        if (data.cardsList) setCardsList(data.cardsList);
                         alert("Dados carregados com sucesso!");
                     } catch (error) {
                         alert("Erro ao ler backup.");
@@ -247,6 +308,7 @@
                 let csvContent = "data:text/csv;charset=utf-8,";
                 csvContent += `Relatório referente a: ${formatMonthYear(viewDate)}\n\n`;
                 csvContent += "Tipo,Descricao,Status,Valor Parcela (Mês Atual)\n";
+                csvContent += `Entrada,Salário Bruto,-,${grossIncome.toFixed(2).replace('.', ',')}\n`; // Exporta Bruto
                 csvContent += `Entrada,Salário Líquido,-,${income.toFixed(2).replace('.', ',')}\n`;
                 
                 fixedExpenses.forEach(item => {
@@ -257,13 +319,14 @@
                     const info = getInstallmentInfo(item, viewDate);
                     if (info.status === 'active') {
                         const monthly = (item.totalValue / item.installments).toFixed(2).replace('.', ',');
-                        csvContent += `Cartão (${item.card}),${item.description},Parcela ${info.label},${monthly}\n`;
+                        const cardName = getCardName(item.cardId);
+                        csvContent += `Cartão (${cardName}),${item.description},Parcela ${info.label},${monthly}\n`;
                     }
                 });
 
                 csvContent += `\nRESUMO,,,\n`;
                 csvContent += `Total Despesas,,,${totalExpenses.toFixed(2).replace('.', ',')}\n`;
-                csvContent += `Saldo Final,,,${balance.toFixed(2).replace('.', ',')}\n`;
+                csvContent += `Saldo Final (Líquido - Despesas),,,${balance.toFixed(2).replace('.', ',')}\n`;
 
                 const link = document.createElement("a");
                 link.setAttribute("href", encodeURI(csvContent));
@@ -274,16 +337,16 @@
             };
 
             return (
-                <div className="max-w-5xl mx-auto p-4 min-h-screen font-sans">
+                <div className="max-w-6xl mx-auto p-4 min-h-screen font-sans">
                     
-                    {/* Top Bar: Data de Referência */}
+                    {/* Top Bar */}
                     <div className="bg-slate-800 text-white p-4 rounded-t-lg shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
                          <div className="flex items-center gap-3">
                             <div className="bg-indigo-500 p-2 rounded-lg">
                                 <Icon name="calendar" size={24} />
                             </div>
                             <div>
-                                <p className="text-xs text-slate-300 uppercase tracking-wider font-semibold">Visualizando Mês de</p>
+                                <p className="text-xs text-slate-300 uppercase tracking-wider font-semibold">Mês de Referência</p>
                                 <div className="flex items-center gap-2">
                                     <input 
                                         type="month" 
@@ -304,19 +367,48 @@
 
                     {/* Cards Resumo */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-white p-4 rounded-b-lg shadow-sm border-x border-b border-slate-200">
+                        {/* Card Renda Atualizado */}
                         <div className="p-4 bg-slate-50 rounded border border-slate-100">
-                            <div className="flex items-center gap-2 mb-1 text-slate-500">
-                                <Icon name="dollar" size={16} /> <span className="text-xs font-bold uppercase">Salário</span>
+                            <div className="flex items-center gap-2 mb-3 text-slate-500">
+                                <Icon name="dollar" size={16} /> <span className="text-xs font-bold uppercase">Renda Mensal</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-xl font-bold text-slate-700">R$</span>
-                                <input type="number" value={income} onChange={(e) => setIncome(Number(e.target.value))} className="text-xl font-bold text-slate-800 w-full bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500" />
+                            
+                            <div className="space-y-3">
+                                {/* Bruto */}
+                                <div>
+                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Bruto (Registro)</label>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-sm text-slate-400">R$</span>
+                                        <input 
+                                            type="number" 
+                                            value={grossIncome} 
+                                            onChange={(e) => setGrossIncome(Number(e.target.value))} 
+                                            className="w-full bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500 text-slate-500 text-sm"
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Líquido */}
+                                <div>
+                                    <label className="text-[10px] text-emerald-600 font-bold uppercase block mb-1">Líquido (Disponível)</label>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xl font-bold text-slate-700">R$</span>
+                                        <input 
+                                            type="number" 
+                                            value={income} 
+                                            onChange={(e) => setIncome(Number(e.target.value))} 
+                                            className="text-xl font-bold text-slate-800 w-full bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500"
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="p-4 bg-slate-50 rounded border border-slate-100">
+                        <div className="p-4 bg-slate-50 rounded border border-slate-100 flex flex-col justify-center">
                             <div className="flex items-center gap-2 mb-1 text-slate-500">
-                                <Icon name="trending" size={16} /> <span className="text-xs font-bold uppercase">Comprometido ({formatMonthYear(viewDate)})</span>
+                                <Icon name="trending" size={16} /> <span className="text-xs font-bold uppercase">Total Gastos ({formatMonthYear(viewDate)})</span>
                             </div>
                             <p className="text-xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
                             <div className="flex gap-2 text-[10px] mt-1 text-slate-400">
@@ -324,120 +416,192 @@
                             </div>
                         </div>
 
-                        <div className={`p-4 rounded border border-slate-100 ${balance < 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                        <div className={`p-4 rounded border border-slate-100 flex flex-col justify-center ${balance < 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                             <div className="flex items-center gap-2 mb-1 text-slate-500">
                                 <Icon name="alert" size={16} /> <span className="text-xs font-bold uppercase">Sobra Livre</span>
                             </div>
                             <p className={`text-xl font-bold ${balanceColor}`}>{formatCurrency(balance)}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Baseado no Salário Líquido</p>
                         </div>
                     </div>
 
-                    {/* Conteúdo Principal */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         
-                        {/* Fixas */}
-                        <div className="lg:col-span-4 bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col">
-                            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
-                                <Icon name="check" size={20} className="text-indigo-600" /> Fixas
-                            </h2>
-                            <div className="flex-grow space-y-3 mb-4 max-h-[400px] overflow-y-auto">
-                                {fixedExpenses.map(expense => (
-                                    <div key={expense.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100 hover:border-slate-300 transition-colors">
-                                        <span className="text-slate-700 font-medium text-sm">{expense.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-800 text-sm">{formatCurrency(expense.amount)}</span>
-                                            <button onClick={() => removeFixedExpense(expense.id)} className="text-slate-300 hover:text-red-500"><Icon name="trash" size={14} /></button>
+                        {/* Coluna Esquerda: Cadastros (Cartões e Fixas) */}
+                        <div className="lg:col-span-4 flex flex-col gap-6">
+                            
+                            {/* MEUS CARTÕES */}
+                            <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
+                                    <Icon name="wallet" size={20} className="text-emerald-600" /> Meus Cartões
+                                </h2>
+                                
+                                {/* Lista de Cartões */}
+                                <div className="space-y-2 mb-4">
+                                    {cardsList.length === 0 ? (
+                                        <p className="text-xs text-slate-400 italic text-center py-2">Cadastre seus cartões aqui.</p>
+                                    ) : (
+                                        cardsList.map(card => {
+                                            const color = CARD_COLORS.find(c => c.class === card.color) || CARD_COLORS[0];
+                                            return (
+                                                <div key={card.id} className="flex justify-between items-center p-2 rounded border border-slate-100 bg-slate-50">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-3 h-3 rounded-full ${color.class}`}></div>
+                                                        <span className="text-sm font-medium text-slate-700">{card.name}</span>
+                                                    </div>
+                                                    <button onClick={() => removeCard(card.id)} className="text-slate-300 hover:text-red-500"><Icon name="trash" size={14}/></button>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Form Add Cartão */}
+                                <div className="bg-slate-50 p-3 rounded-md border border-slate-100">
+                                    <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase">Novo Cartão</p>
+                                    <div className="flex flex-col gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nome (ex: Nubank)" 
+                                            value={newCardName} 
+                                            onChange={(e) => setNewCardName(e.target.value)} 
+                                            className="w-full p-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                        />
+                                        <div className="flex gap-2">
+                                            {/* Color Picker Simplificado */}
+                                            <div className="flex-1 flex gap-1 items-center overflow-x-auto pb-1">
+                                                {CARD_COLORS.map(c => (
+                                                    <button 
+                                                        key={c.name}
+                                                        onClick={() => setNewCardColor(c.class)}
+                                                        className={`w-5 h-5 rounded-full ${c.class} ${newCardColor === c.class ? 'ring-2 ring-offset-1 ring-slate-400' : ''}`}
+                                                        title={c.name}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <button onClick={addCard} className="bg-emerald-600 text-white px-3 rounded-md hover:bg-emerald-700 text-xs font-bold uppercase">Criar</button>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                            <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100 mt-auto">
-                                <p className="text-[10px] font-bold text-indigo-700 mb-2 uppercase">Nova Fixa</p>
-                                <div className="flex flex-col gap-2">
-                                    <input type="text" placeholder="Nome" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                                    <div className="flex gap-2">
-                                        <input type="number" placeholder="R$" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} className="flex-1 p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                                        <button onClick={addFixedExpense} className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 w-10 flex items-center justify-center"><Icon name="plus" size={18} /></button>
+
+                            {/* FIXAS */}
+                            <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col flex-grow">
+                                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
+                                    <Icon name="check" size={20} className="text-indigo-600" /> Contas Fixas
+                                </h2>
+                                <div className="flex-grow space-y-3 mb-4 max-h-[300px] overflow-y-auto">
+                                    {fixedExpenses.length === 0 && <p className="text-xs text-slate-400 italic text-center">Nenhuma conta fixa.</p>}
+                                    {fixedExpenses.map(expense => (
+                                        <div key={expense.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100 hover:border-slate-300 transition-colors">
+                                            <span className="text-slate-700 font-medium text-sm">{expense.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-800 text-sm">{formatCurrency(expense.amount)}</span>
+                                                <button onClick={() => removeFixedExpense(expense.id)} className="text-slate-300 hover:text-red-500"><Icon name="trash" size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100 mt-auto">
+                                    <p className="text-[10px] font-bold text-indigo-700 mb-2 uppercase">Nova Fixa</p>
+                                    <div className="flex flex-col gap-2">
+                                        <input type="text" placeholder="Nome (ex: Internet)" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                        <div className="flex gap-2">
+                                            <input type="number" placeholder="R$" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} className="flex-1 p-2 text-sm border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                            <button onClick={addFixedExpense} className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 w-10 flex items-center justify-center"><Icon name="plus" size={18} /></button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Cartões */}
+                        {/* Coluna Direita: Lançamentos */}
                         <div className="lg:col-span-8 bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col">
                             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-700 border-b pb-2">
-                                <Icon name="card" size={20} className="text-purple-600" /> Parcelamentos
+                                <Icon name="card" size={20} className="text-purple-600" /> Parcelamentos & Compras
                             </h2>
                             
                             {/* Simulador */}
-                            <div className="bg-gradient-to-r from-purple-50 to-white p-4 rounded-xl border border-purple-100 mb-6 shadow-sm">
-                                <p className="text-xs font-bold text-purple-700 mb-3 uppercase flex items-center gap-1">
-                                    <Icon name="calc" size={14} /> Adicionar Compra (Retroativa ou Nova)
+                            <div className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                                <p className="text-xs font-bold text-slate-600 mb-3 uppercase flex items-center gap-1">
+                                    <Icon name="calc" size={14} /> Adicionar Compra
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">DESCRIÇÃO & CARTÃO</label>
-                                        <div className="flex gap-2">
-                                            <select value={selectedCard} onChange={(e) => setSelectedCard(e.target.value)} className="w-1/3 p-2 text-sm border border-purple-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                                <option value="Nubank">Nubank</option><option value="Bradescard">Amazon</option><option value="Santander">Santander</option>
-                                            </select>
-                                            <input type="text" placeholder="Ex: Tênis" value={newCardExpenseDesc} onChange={(e) => setNewCardExpenseDesc(e.target.value)} className="flex-1 p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                                
+                                {cardsList.length === 0 ? (
+                                    <div className="text-center p-4 bg-yellow-50 border border-yellow-100 rounded text-yellow-700 text-sm">
+                                        ⚠️ Cadastre pelo menos um cartão na esquerda para adicionar compras.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] text-slate-500 ml-1 font-bold">DESCRIÇÃO & CARTÃO</label>
+                                            <div className="flex gap-2">
+                                                <select 
+                                                    value={selectedCardId} 
+                                                    onChange={(e) => setSelectedCardId(e.target.value)} 
+                                                    className="w-1/3 p-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                                >
+                                                    <option value="" disabled>Selecione...</option>
+                                                    {cardsList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                </select>
+                                                <input type="text" placeholder="Ex: Tênis" value={newCardExpenseDesc} onChange={(e) => setNewCardExpenseDesc(e.target.value)} className="flex-1 p-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 ml-1 font-bold">VALOR TOTAL</label>
+                                            <input type="number" placeholder="0,00" value={newCardExpenseValue} onChange={(e) => setNewCardExpenseValue(e.target.value)} className="w-full p-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 ml-1 font-bold">PARCELAS</label>
+                                            <input type="number" placeholder="1" value={newCardInstallments} onChange={(e) => setNewCardInstallments(e.target.value)} className="w-full p-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] text-slate-500 ml-1 font-bold">MÊS DA 1ª PARCELA</label>
+                                            <input 
+                                                type="month" 
+                                                value={newCardDate} 
+                                                onChange={(e) => setNewCardDate(e.target.value)} 
+                                                className="w-full p-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500" 
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 flex items-end justify-between">
+                                            <div className="mb-2">
+                                                <p className="text-xs text-slate-500">Valor da Parcela:</p>
+                                                <p className="text-lg font-bold text-slate-700">{formatCurrency(previewInstallment)}</p>
+                                            </div>
+                                            <button onClick={addCardExpense} className="bg-slate-800 text-white px-6 py-2 rounded-md hover:bg-slate-700 shadow-sm font-medium transition-colors text-sm flex items-center gap-2 h-10 mb-1"><Icon name="plus" size={16} /> Lançar</button>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">VALOR TOTAL</label>
-                                        <input type="number" placeholder="0,00" value={newCardExpenseValue} onChange={(e) => setNewCardExpenseValue(e.target.value)} className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">PARCELAS</label>
-                                        <input type="number" placeholder="1" value={newCardInstallments} onChange={(e) => setNewCardInstallments(e.target.value)} className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] text-slate-500 ml-1 font-bold">MÊS DA 1ª PARCELA</label>
-                                        <input 
-                                            type="month" 
-                                            value={newCardDate} 
-                                            onChange={(e) => setNewCardDate(e.target.value)} 
-                                            className="w-full p-2 text-sm border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" 
-                                        />
-                                        <span className="text-[10px] text-slate-400">Para retroativo, selecione um mês passado.</span>
-                                    </div>
-                                    <div className="md:col-span-2 flex items-end justify-between">
-                                         <div className="mb-2">
-                                            <p className="text-xs text-purple-800">Mensal:</p>
-                                            <p className="text-lg font-bold text-purple-700">{formatCurrency(previewInstallment)}</p>
-                                         </div>
-                                         <button onClick={addCardExpense} className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 shadow-sm font-medium transition-colors text-sm flex items-center gap-2 h-10 mb-1"><Icon name="plus" size={16} /> Adicionar</button>
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Lista Inteligente */}
                             <div className="flex-grow space-y-2">
                                 <div className="flex justify-between items-center mb-2 px-1">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Situação em {formatMonthYear(viewDate)}</h3>
-                                    <span className="text-xs text-slate-400">{cardExpenses.length} cadastrados</span>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Fatura em {formatMonthYear(viewDate)}</h3>
+                                    <span className="text-xs text-slate-400">{cardExpenses.length} lançamentos</span>
                                 </div>
                                 {cardExpenses.length === 0 ? (
-                                    <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-lg"><p className="text-sm text-slate-400">Nenhuma compra cadastrada.</p></div>
+                                    <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-lg"><p className="text-sm text-slate-400">Nenhum lançamento.</p></div>
                                 ) : (
                                     cardExpenses.slice().reverse().map(expense => {
                                         const installmentValue = expense.totalValue / expense.installments;
                                         const info = getInstallmentInfo(expense, viewDate);
+                                        const color = getCardColor(expense.cardId);
+                                        const cardName = getCardName(expense.cardId);
                                         
-                                        // Define estilo baseado no status (Ativo = Forte, Pago/Futuro = Opaco)
-                                        const opacityClass = info.status === 'active' ? 'opacity-100 border-purple-200 bg-white shadow-sm' : 'opacity-60 bg-slate-50 border-slate-100 grayscale';
-                                        const statusBadgeColor = info.status === 'active' ? 'bg-green-100 text-green-700' : info.status === 'paid' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-700';
+                                        const opacityClass = info.status === 'active' ? `opacity-100 bg-white shadow-sm ${color.border}` : 'opacity-60 bg-slate-50 border-slate-100 grayscale';
+                                        const statusBadgeColor = info.status === 'active' ? color.light + ' ' + color.text : info.status === 'paid' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-700';
 
                                         return (
                                             <div key={expense.id} className={`p-3 rounded-md border relative group transition-all ${opacityClass}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-1 h-10 rounded-full ${expense.card === 'Nubank' ? 'bg-purple-500' : expense.card === 'Santander' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                                                        <div className={`w-1 h-10 rounded-full ${color.class}`}></div>
                                                         <div>
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-slate-800 font-bold text-sm">{expense.description}</span>
-                                                                <span className="text-[10px] uppercase text-slate-400 border px-1 rounded">{expense.card}</span>
+                                                                <span className="text-[10px] uppercase text-slate-400 border px-1 rounded">{cardName}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-0.5">
                                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${statusBadgeColor}`}>
@@ -452,8 +616,8 @@
                                                     <div className="text-right pr-8">
                                                         {info.status === 'active' ? (
                                                             <>
-                                                                <span className="block font-bold text-red-600 text-base">{formatCurrency(installmentValue)}</span>
-                                                                <span className="text-[10px] text-slate-400 block -mt-1">neste mês</span>
+                                                                <span className={`block font-bold text-base ${color.text}`}>{formatCurrency(installmentValue)}</span>
+                                                                <span className="text-[10px] text-slate-400 block -mt-1">na fatura</span>
                                                             </>
                                                         ) : (
                                                             <span className="text-xs text-slate-400 font-medium italic">--</span>
