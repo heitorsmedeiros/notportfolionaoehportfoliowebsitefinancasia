@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Controle Financeiro Pessoal</title>
     
     <!-- Tailwind CSS (Estilos) -->
@@ -16,10 +16,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
         /* Ajuste para input date/month ficar bonito */
         input[type="month"] {
-            min-width: 140px;
+            min-width: auto;
+            max-width: 100%;
         }
         /* Custom Scrollbar for color picker */
         .no-scrollbar::-webkit-scrollbar {
@@ -29,11 +30,17 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        /* Mobile improvements */
+        @media (max-width: 640px) {
+            .mobile-reverse-col {
+                flex-direction: column-reverse;
+            }
+        }
     </style>
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="bg-slate-100 text-slate-800 pb-10">
 
     <div id="root"></div>
 
@@ -60,7 +67,8 @@
                 search: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>,
                 pix: <><path d="M5 12l5 5l10 -10" /><circle cx="12" cy="12" r="9" /></>, 
                 qr: <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></>,
-                piggy: <><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2.5 0-.8.3-2.4-.5-3C20.5 6.5 19 5 19 5z"/><path d="M16 10h.01"/></>
+                piggy: <><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2.5 0-.8.3-2.4-.5-3C20.5 6.5 19 5 19 5z"/><path d="M16 10h.01"/></>,
+                menu: <path d="M3 12h18M3 6h18M3 18h18" />
             };
 
             return (
@@ -93,12 +101,9 @@
             { name: 'Amarelo', class: 'bg-yellow-500', text: 'text-yellow-600', border: 'border-yellow-200', light: 'bg-yellow-100', ring: 'ring-yellow-500' },
         ];
         
-        // Cor Especial para PIX
         const PIX_COLOR = { name: 'Pix', class: 'bg-teal-500', text: 'text-teal-600', border: 'border-teal-200', light: 'bg-teal-50', ring: 'ring-teal-500' };
 
-        // --- Componente Principal ---
         const FinancialManager = () => {
-            // --- Estado Inicial ---
             const loadInitialState = (key, defaultValue) => {
                 try {
                     const saved = localStorage.getItem(key);
@@ -108,15 +113,11 @@
                 }
             };
 
-            // Helpers de Data
-            const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7); // YYYY-MM
-            
+            const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
             const [viewDate, setViewDate] = useState(getCurrentMonthStr()); 
 
-            // DADOS INICIAIS
             const [income, setIncome] = useState(() => loadInitialState('fin_income', 0)); 
             const [grossIncome, setGrossIncome] = useState(() => loadInitialState('fin_gross_income', 0)); 
-            // NOVOS CAMPOS: Ativos
             const [accountBalance, setAccountBalance] = useState(() => loadInitialState('fin_acc_balance', 0));
             const [investments, setInvestments] = useState(() => loadInitialState('fin_investments', 0));
 
@@ -124,7 +125,6 @@
             const [cardExpenses, setCardExpenses] = useState(() => loadInitialState('fin_cards', []));
             const [cardsList, setCardsList] = useState(() => loadInitialState('fin_cards_list', []));
 
-            // Persistência automática
             useEffect(() => {
                 localStorage.setItem('fin_income', JSON.stringify(income));
                 localStorage.setItem('fin_gross_income', JSON.stringify(grossIncome));
@@ -135,15 +135,12 @@
                 localStorage.setItem('fin_cards_list', JSON.stringify(cardsList));
             }, [income, grossIncome, accountBalance, investments, fixedExpenses, cardExpenses, cardsList]);
 
-            // Formulários
             const [newExpenseName, setNewExpenseName] = useState('');
             const [newExpenseAmount, setNewExpenseAmount] = useState('');
-            
             const [newCardName, setNewCardName] = useState('');
             const [newCardColor, setNewCardColor] = useState(CARD_COLORS[0].class);
 
-            // Formulário Compras
-            const [transactionType, setTransactionType] = useState('credit'); // 'credit' ou 'pix'
+            const [transactionType, setTransactionType] = useState('credit'); 
             const [newCardExpenseDesc, setNewCardExpenseDesc] = useState('');
             const [newCardExpenseValue, setNewCardExpenseValue] = useState('');
             const [newCardInstallments, setNewCardInstallments] = useState(1);
@@ -152,7 +149,6 @@
 
             const fileInputRef = useRef(null);
 
-            // Helpers de Formatação
             const formatCurrency = (value) => {
                 return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
             };
@@ -182,7 +178,6 @@
                 return card ? card.name : 'Cartão Removido';
             };
 
-            // LÓGICA DE CÁLCULO
             const getInstallmentInfo = (expense, currentViewDate) => {
                 const startDateStr = expense.firstInstallment || getCurrentMonthStr();
                 const [startYear, startMonth] = startDateStr.split('-').map(Number);
@@ -234,7 +229,6 @@
 
             const totalAssets = (parseFloat(accountBalance) || 0) + (parseFloat(investments) || 0);
 
-            // --- Ações ---
             const addCard = () => {
                 if (!newCardName) return;
                 const newId = Date.now();
@@ -299,10 +293,9 @@
                 setCardExpenses(cardExpenses.filter(item => item.id !== id));
             };
 
-            // Backup & Migration
             const exportBackup = () => {
                 const data = { 
-                    income, grossIncome, accountBalance, investments, // Novos
+                    income, grossIncome, accountBalance, investments, 
                     fixedExpenses, cardExpenses, cardsList, 
                     exportDate: new Date().toISOString() 
                 };
@@ -403,18 +396,17 @@
             };
 
             return (
-                <div className="max-w-7xl mx-auto p-4 min-h-screen font-sans pb-20">
+                <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen font-sans pb-20">
                     
-                    {/* Header Moderno */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-6 sticky top-4 z-50 backdrop-blur-md bg-white/90">
-                         <div className="flex items-center gap-4">
-                            <div className="bg-indigo-600 p-3 rounded-xl shadow-indigo-200 shadow-lg text-white">
-                                <Icon name="wallet" size={28} />
+                    {/* Header Moderno (Mobile Optimized) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-2 z-50 backdrop-blur-md bg-white/95">
+                         <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="bg-indigo-600 p-2 md:p-3 rounded-xl shadow-indigo-200 shadow-lg text-white">
+                                <Icon name="wallet" size={24} />
                             </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Financeiro</h1>
-                                <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                                    <span>Mês de Referência:</span>
+                            <div className="flex-1 md:flex-none">
+                                <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight leading-none">Financeiro</h1>
+                                <div className="flex items-center gap-2 text-slate-500 text-xs md:text-sm font-medium mt-1">
                                     <input 
                                         type="month" 
                                         value={viewDate} 
@@ -423,9 +415,15 @@
                                     />
                                 </div>
                             </div>
+                            {/* Mobile Actions Mini */}
+                            <div className="flex md:hidden gap-1">
+                                <button onClick={triggerImport} className="p-2 text-slate-400 bg-slate-50 rounded-lg"><Icon name="upload" size={18}/></button>
+                                <button onClick={exportBackup} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg"><Icon name="json" size={18}/></button>
+                            </div>
                          </div>
                          
-                         <div className="flex gap-2">
+                         {/* Desktop Actions */}
+                         <div className="hidden md:flex gap-2">
                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json" className="hidden" />
                             <button onClick={triggerImport} className="flex flex-col items-center justify-center p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all w-16 group">
                                 <Icon name="upload" size={20} className="mb-1 group-hover:scale-110 transition-transform"/>
@@ -442,19 +440,19 @@
                          </div>
                     </div>
 
-                    {/* Dashboard Grid - Agora com 4 Colunas */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {/* Dashboard Grid - Responsivo */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
                         
                         {/* 1. Renda */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-shadow">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
                                 <Icon name="dollar" size={64} className="text-slate-800"/>
                             </div>
-                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <span className="bg-slate-100 p-1.5 rounded-md"><Icon name="dollar" size={14}/></span>
-                                Renda Mensal
+                                Renda
                             </h3>
-                            <div className="space-y-4 relative z-10">
+                            <div className="space-y-3 relative z-10">
                                 <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                                     <label className="text-xs text-slate-400 font-medium uppercase">Bruto</label>
                                     <div className="flex items-center gap-1 w-24">
@@ -472,16 +470,16 @@
                             </div>
                         </div>
 
-                        {/* 2. Reservas (NOVO CARD) */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-shadow">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        {/* 2. Reservas */}
+                        <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
                                 <Icon name="piggy" size={64} className="text-indigo-800"/>
                             </div>
-                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <span className="bg-indigo-50 text-indigo-600 p-1.5 rounded-md"><Icon name="piggy" size={14}/></span>
-                                Reservas & Ativos
+                                Ativos
                             </h3>
-                            <div className="space-y-3 relative z-10">
+                            <div className="space-y-2 relative z-10">
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs text-slate-500 font-medium">Conta</label>
                                     <input type="number" value={accountBalance} onChange={(e) => setAccountBalance(Number(e.target.value))} className="w-24 text-right bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-500 focus:outline-none text-sm font-bold text-slate-700" placeholder="0"/>
@@ -491,187 +489,93 @@
                                     <input type="number" value={investments} onChange={(e) => setInvestments(Number(e.target.value))} className="w-24 text-right bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-500 focus:outline-none text-sm font-bold text-slate-700" placeholder="0"/>
                                 </div>
                                 <div className="pt-2 border-t border-slate-50 flex justify-between items-center mt-1">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Total Acumulado</span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Total</span>
                                     <span className="text-sm font-bold text-indigo-700">{formatCurrency(totalAssets)}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* 3. Saídas */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+                            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <span className="bg-red-50 text-red-600 p-1.5 rounded-md"><Icon name="trending" size={14}/></span>
-                                Saídas ({formatMonthYear(viewDate)})
+                                Saídas
                             </h3>
                             <div className="mt-2">
-                                <p className="text-3xl font-bold text-slate-800">{formatCurrency(totalExpenses)}</p>
-                                <div className="mt-4 flex gap-1">
-                                    <div className="px-1 py-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] text-slate-500 flex-1 text-center">
-                                        <span className="block font-bold text-slate-700 text-xs">{formatCurrency(totalFixed)}</span>
-                                        Fixas
+                                <p className="text-2xl md:text-3xl font-bold text-slate-800">{formatCurrency(totalExpenses)}</p>
+                                <div className="mt-3 flex gap-1 overflow-x-auto no-scrollbar">
+                                    <div className="px-2 py-1 bg-slate-50 rounded border border-slate-100 text-[10px] text-slate-500 whitespace-nowrap">
+                                        <span className="block font-bold text-slate-700 text-xs">{formatCurrency(totalFixed)}</span> Fixas
                                     </div>
-                                    <div className="px-1 py-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] text-slate-500 flex-1 text-center">
-                                        <span className="block font-bold text-slate-700 text-xs">{formatCurrency(totalCardBill)}</span>
-                                        Cartão
+                                    <div className="px-2 py-1 bg-slate-50 rounded border border-slate-100 text-[10px] text-slate-500 whitespace-nowrap">
+                                        <span className="block font-bold text-slate-700 text-xs">{formatCurrency(totalCardBill)}</span> Cartão
                                     </div>
-                                    <div className="px-1 py-1 bg-teal-50 rounded-lg border border-teal-100 text-[10px] text-teal-600 flex-1 text-center">
-                                        <span className="block font-bold text-teal-700 text-xs">{formatCurrency(totalPix)}</span>
-                                        Pix
+                                    <div className="px-2 py-1 bg-teal-50 rounded border border-teal-100 text-[10px] text-teal-600 whitespace-nowrap">
+                                        <span className="block font-bold text-teal-700 text-xs">{formatCurrency(totalPix)}</span> Pix
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* 4. Saldo Livre */}
-                        <div className={`p-6 rounded-2xl shadow-sm border ${balanceBg} hover:shadow-md transition-shadow relative overflow-hidden`}>
-                             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <div className={`p-5 md:p-6 rounded-2xl shadow-sm border ${balanceBg} relative overflow-hidden`}>
+                             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <span className="bg-white/50 p-1.5 rounded-md"><Icon name="wallet" size={14}/></span>
                                 Saldo Livre
                             </h3>
                             <div className="mt-2 relative z-10">
-                                <p className={`text-4xl font-bold ${balanceColor}`}>{formatCurrency(balance)}</p>
-                                <p className="text-xs text-slate-500 mt-2 font-medium opacity-80">
-                                    (Receita Líquida - Despesas do Mês)
+                                <p className={`text-3xl md:text-4xl font-bold ${balanceColor}`}>{formatCurrency(balance)}</p>
+                                <p className="text-[10px] md:text-xs text-slate-500 mt-2 font-medium opacity-80">
+                                    (Líquido - Despesas)
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
                         
-                        {/* SIDEBAR: Cadastros */}
-                        <div className="lg:col-span-4 flex flex-col gap-8">
-                            
-                            {/* MEUS CARTÕES */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                <h2 className="text-base font-bold mb-4 flex items-center gap-2 text-slate-800">
-                                    Meus Cartões
-                                    <span className="text-xs font-normal text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{cardsList.length}</span>
-                                </h2>
-                                
-                                <div className="space-y-3 mb-6">
-                                    {cardsList.length === 0 ? (
-                                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                            <p className="text-xs text-slate-400">Nenhum cartão cadastrado.</p>
-                                        </div>
-                                    ) : (
-                                        cardsList.map(card => {
-                                            const color = CARD_COLORS.find(c => c.class === card.color) || CARD_COLORS[0];
-                                            return (
-                                                <div key={card.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50 group hover:border-slate-200 transition-colors">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-5 rounded-md shadow-sm ${color.class}`}></div>
-                                                        <span className="text-sm font-semibold text-slate-700">{card.name}</span>
-                                                    </div>
-                                                    <button onClick={() => removeCard(card.id)} className="text-slate-300 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"><Icon name="trash" size={14}/></button>
-                                                </div>
-                                            )
-                                        })
-                                    )}
-                                </div>
-
-                                <div className="pt-4 border-t border-slate-100">
-                                    <div className="space-y-3">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Nome do novo cartão..." 
-                                            value={newCardName} 
-                                            onChange={(e) => setNewCardName(e.target.value)} 
-                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" 
-                                        />
-                                        <div className="flex gap-2 items-center">
-                                            <div className="flex-1 flex gap-2 items-center overflow-x-auto no-scrollbar py-1">
-                                                {CARD_COLORS.map(c => (
-                                                    <button 
-                                                        key={c.name}
-                                                        onClick={() => setNewCardColor(c.class)}
-                                                        className={`w-6 h-6 rounded-full ${c.class} border-2 border-white shadow-sm hover:scale-110 transition-transform ${newCardColor === c.class ? `scale-110 ring-2 ring-offset-2 ${c.ring}` : 'opacity-70 hover:opacity-100'}`}
-                                                        title={c.name}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <button onClick={addCard} className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 text-xs font-bold transition-transform active:scale-95 shadow-lg shadow-slate-200">
-                                                Criar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* FIXAS */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-grow">
-                                <h2 className="text-base font-bold mb-4 flex items-center gap-2 text-slate-800">
-                                    Contas Fixas
-                                    <span className="text-xs font-normal text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{fixedExpenses.length}</span>
-                                </h2>
-                                
-                                <div className="flex-grow space-y-2 mb-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {fixedExpenses.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Nenhuma conta fixa.</p>}
-                                    {fixedExpenses.map(expense => (
-                                        <div key={expense.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all group">
-                                            <span className="text-slate-600 font-medium text-sm group-hover:text-slate-900">{expense.name}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-bold text-slate-800 text-sm">{formatCurrency(expense.amount)}</span>
-                                                <button onClick={() => removeFixedExpense(expense.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="trash" size={14} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                
-                                <div className="pt-4 border-t border-slate-100">
-                                    <div className="flex flex-col gap-3">
-                                        <input type="text" placeholder="Nome (ex: Internet)" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" />
-                                        <div className="flex gap-2">
-                                            <input type="number" placeholder="Valor (R$)" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" />
-                                            <button onClick={addFixedExpense} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 w-12 flex items-center justify-center shadow-lg shadow-indigo-100 transition-transform active:scale-95"><Icon name="plus" size={20} /></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* MAIN: Lançamentos */}
-                        <div className="lg:col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-                            <h2 className="text-base font-bold mb-6 flex items-center gap-2 text-slate-800">
+                        {/* MAIN: Lançamentos (AGORA PRIMEIRO NO MOBILE via CSS Grid Order) */}
+                        <div className="lg:col-span-8 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col order-1 lg:order-2">
+                            <h2 className="text-base font-bold mb-4 md:mb-6 flex items-center gap-2 text-slate-800">
                                 Faturas & Saídas
                             </h2>
                             
                             {/* Card de Adição de Compra */}
-                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 transition-colors">
-                                <div className="flex justify-between items-center mb-4">
+                            <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200 mb-6 md:mb-8 transition-colors">
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-3">
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                                         <Icon name={transactionType === 'pix' ? 'pix' : 'calc'} size={14} /> Nova Transação
                                     </h3>
                                     {/* Toggle Switch */}
-                                    <div className="flex bg-white rounded-lg p-1 border border-slate-200 shadow-sm">
+                                    <div className="flex bg-white rounded-lg p-1 border border-slate-200 shadow-sm self-start sm:self-auto">
                                         <button 
                                             onClick={() => setTransactionType('credit')}
-                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${transactionType === 'credit' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${transactionType === 'credit' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                         >
                                             Crédito
                                         </button>
                                         <button 
                                             onClick={() => setTransactionType('pix')}
-                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${transactionType === 'pix' ? 'bg-teal-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${transactionType === 'pix' ? 'bg-teal-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                         >
-                                            Pix / Dinheiro
+                                            Pix/$$
                                         </button>
                                     </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4">
                                     
-                                    {/* Seletor de Cartão (Apenas se for Crédito) */}
+                                    {/* Seletor de Cartão */}
                                     {transactionType === 'credit' && (
                                         <div className="md:col-span-3">
                                             <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Cartão</label>
                                             {cardsList.length === 0 ? (
-                                                <div className="text-xs text-rose-500 font-bold py-2 px-1">Cadastre um cartão!</div>
+                                                <div className="text-xs text-rose-500 font-bold py-2 px-1">Cadastre! 👇</div>
                                             ) : (
                                                 <select 
                                                     value={selectedCardId} 
                                                     onChange={(e) => setSelectedCardId(e.target.value)} 
-                                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                                 >
                                                     <option value="" disabled>Selecione...</option>
                                                     {cardsList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -682,50 +586,50 @@
                                     
                                     <div className={`${transactionType === 'credit' ? 'md:col-span-5' : 'md:col-span-8'}`}>
                                         <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Descrição</label>
-                                        <input type="text" placeholder={transactionType === 'pix' ? "Ex: IPVA, Jantar..." : "Ex: Tênis"} value={newCardExpenseDesc} onChange={(e) => setNewCardExpenseDesc(e.target.value)} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
+                                        <input type="text" placeholder={transactionType === 'pix' ? "Ex: IPVA..." : "Ex: Tênis"} value={newCardExpenseDesc} onChange={(e) => setNewCardExpenseDesc(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
                                     </div>
 
                                     <div className="md:col-span-4">
                                         <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">
-                                            {transactionType === 'pix' ? 'Data do Pagamento' : 'Mês 1ª Parcela'}
+                                            {transactionType === 'pix' ? 'Data' : '1ª Parcela'}
                                         </label>
                                         <input 
                                             type="month" 
                                             value={newCardDate} 
                                             onChange={(e) => setNewCardDate(e.target.value)} 
-                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" 
+                                            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" 
                                         />
                                     </div>
 
                                     <div className="md:col-span-3">
-                                        <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Valor Total</label>
-                                        <input type="number" placeholder="0,00" value={newCardExpenseValue} onChange={(e) => setNewCardExpenseValue(e.target.value)} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
+                                        <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Total (R$)</label>
+                                        <input type="number" placeholder="0,00" value={newCardExpenseValue} onChange={(e) => setNewCardExpenseValue(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
                                     </div>
 
                                     {transactionType === 'credit' ? (
                                         <div className="md:col-span-3">
-                                            <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Parcelas</label>
-                                            <input type="number" placeholder="1" value={newCardInstallments} onChange={(e) => setNewCardInstallments(e.target.value)} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
+                                            <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Vezes</label>
+                                            <input type="number" placeholder="1" value={newCardInstallments} onChange={(e) => setNewCardInstallments(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" />
                                         </div>
                                     ) : (
                                         <div className="md:col-span-3">
                                             <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Tipo</label>
-                                            <div className="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-100 text-slate-500 rounded-lg font-medium cursor-not-allowed">
+                                            <div className="w-full px-3 py-2.5 text-sm border border-slate-200 bg-slate-100 text-slate-500 rounded-lg font-medium cursor-not-allowed">
                                                 À Vista
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="md:col-span-6 flex items-end gap-4">
-                                        <div className={`flex-1 px-3 py-1.5 rounded-lg border ${transactionType === 'pix' ? 'bg-teal-50 border-teal-100' : 'bg-indigo-50 border-indigo-100'}`}>
+                                    <div className="md:col-span-6 flex items-end gap-3 mt-2 md:mt-0">
+                                        <div className={`flex-1 px-3 py-2 rounded-lg border ${transactionType === 'pix' ? 'bg-teal-50 border-teal-100' : 'bg-indigo-50 border-indigo-100'}`}>
                                             <p className={`text-[10px] font-bold uppercase ${transactionType === 'pix' ? 'text-teal-600' : 'text-indigo-400'}`}>Valor a Pagar</p>
-                                            <p className={`text-lg font-bold ${transactionType === 'pix' ? 'text-teal-700' : 'text-indigo-700'}`}>{formatCurrency(transactionType === 'pix' ? (parseFloat(newCardExpenseValue.replace(',', '.')) || 0) : previewInstallment)}</p>
+                                            <p className={`text-lg font-bold leading-none ${transactionType === 'pix' ? 'text-teal-700' : 'text-indigo-700'}`}>{formatCurrency(transactionType === 'pix' ? (parseFloat(newCardExpenseValue.replace(',', '.')) || 0) : previewInstallment)}</p>
                                         </div>
                                         <button 
                                             onClick={addTransaction} 
-                                            className={`h-11 px-6 text-white rounded-lg text-sm font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${transactionType === 'pix' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-slate-800 hover:bg-slate-900 shadow-slate-200'}`}
+                                            className={`h-[50px] md:h-auto px-6 text-white rounded-lg text-sm font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${transactionType === 'pix' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-slate-800 hover:bg-slate-900 shadow-slate-200'}`}
                                         >
-                                            <Icon name="plus" size={18}/> Lançar
+                                            <Icon name="plus" size={18}/>
                                         </button>
                                     </div>
                                 </div>
@@ -751,10 +655,6 @@
                                             const color = getCardColor(expense.cardId);
                                             const cardName = getCardName(expense.cardId);
                                             
-                                            // Se não for o mês de referência e for pix, não deve aparecer na lista (para evitar poluição visual de meses passados)
-                                            // A lógica getInstallmentInfo já filtra isso via status 'active' ou 'paid', mas vamos ocultar visualmente o que não é deste mês se desejar
-                                            // Por enquanto mostramos tudo para manter histórico visível, mas com opacidade
-                                            
                                             const activeStyle = info.status === 'active' 
                                                 ? `bg-white shadow-sm border-l-4 ${color.border.replace('border-', 'border-l-')}` 
                                                 : 'bg-slate-50 opacity-50 grayscale border border-slate-100';
@@ -764,23 +664,23 @@
                                                 : info.status === 'paid' ? 'bg-slate-200 text-slate-500' : 'bg-blue-50 text-blue-600';
 
                                             return (
-                                                <div key={expense.id} className={`p-4 rounded-xl border relative group transition-all hover:shadow-md ${activeStyle}`}>
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                        <div className="flex items-start gap-4">
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm ${color.class}`}>
+                                                <div key={expense.id} className={`p-4 rounded-xl border relative group transition-all active:scale-[0.99] ${activeStyle}`}>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                                                        <div className="flex items-start gap-3 md:gap-4">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm shrink-0 ${color.class}`}>
                                                                 {expense.cardId === 'pix' ? <Icon name="qr" size={16}/> : <span className="text-[10px] font-bold">{cardName.substring(0,2).toUpperCase()}</span>}
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-slate-800 font-bold text-sm">{expense.description}</h4>
+                                                                <h4 className="text-slate-800 font-bold text-sm line-clamp-1">{expense.description}</h4>
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-[10px] uppercase text-slate-500 font-medium tracking-wide">{cardName}</span>
+                                                                    <span className="text-[10px] uppercase text-slate-500 font-medium tracking-wide line-clamp-1">{cardName}</span>
                                                                     <span className="text-slate-300">•</span>
-                                                                    <span className="text-[10px] text-slate-500">Total: {formatCurrency(expense.totalValue)}</span>
+                                                                    <span className="text-[10px] text-slate-500 whitespace-nowrap">Total: {formatCurrency(expense.totalValue)}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex items-center justify-between sm:justify-end gap-6 pl-14 sm:pl-0">
+                                                        <div className="flex items-center justify-between sm:justify-end gap-6 pl-12 sm:pl-0">
                                                              <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${badgeStyle}`}>
                                                                 {info.label}
                                                             </span>
@@ -798,7 +698,7 @@
                                                     
                                                     <button 
                                                         onClick={() => removeCardExpense(expense.id)} 
-                                                        className="absolute top-2 right-2 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        className="absolute top-2 right-2 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-100 sm:opacity-0 group-hover:opacity-100"
                                                         title="Remover"
                                                     >
                                                         <Icon name="trash" size={16} />
@@ -808,6 +708,97 @@
                                         })}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* SIDEBAR: Cadastros (AGORA SEGUNDO NO MOBILE) */}
+                        <div className="lg:col-span-4 flex flex-col gap-6 md:gap-8 order-2 lg:order-1">
+                            
+                            {/* MEUS CARTÕES */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h2 className="text-base font-bold mb-4 flex items-center gap-2 text-slate-800">
+                                    Meus Cartões
+                                    <span className="text-xs font-normal text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{cardsList.length}</span>
+                                </h2>
+                                
+                                <div className="space-y-3 mb-6">
+                                    {cardsList.length === 0 ? (
+                                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                            <p className="text-xs text-slate-400">Nenhum cartão cadastrado.</p>
+                                        </div>
+                                    ) : (
+                                        cardsList.map(card => {
+                                            const color = CARD_COLORS.find(c => c.class === card.color) || CARD_COLORS[0];
+                                            return (
+                                                <div key={card.id} className="flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50 group hover:border-slate-200 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-5 rounded-md shadow-sm ${color.class}`}></div>
+                                                        <span className="text-sm font-semibold text-slate-700">{card.name}</span>
+                                                    </div>
+                                                    <button onClick={() => removeCard(card.id)} className="text-slate-300 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 transition-all opacity-100 sm:opacity-0 group-hover:opacity-100"><Icon name="trash" size={14}/></button>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="space-y-3">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nome do novo cartão..." 
+                                            value={newCardName} 
+                                            onChange={(e) => setNewCardName(e.target.value)} 
+                                            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" 
+                                        />
+                                        <div className="flex gap-2 items-center">
+                                            <div className="flex-1 flex gap-2 items-center overflow-x-auto no-scrollbar py-1">
+                                                {CARD_COLORS.map(c => (
+                                                    <button 
+                                                        key={c.name}
+                                                        onClick={() => setNewCardColor(c.class)}
+                                                        className={`w-6 h-6 rounded-full shrink-0 ${c.class} border-2 border-white shadow-sm hover:scale-110 transition-transform ${newCardColor === c.class ? `scale-110 ring-2 ring-offset-2 ${c.ring}` : 'opacity-70 hover:opacity-100'}`}
+                                                        title={c.name}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <button onClick={addCard} className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 text-xs font-bold transition-transform active:scale-95 shadow-lg shadow-slate-200">
+                                                Criar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* FIXAS */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-grow">
+                                <h2 className="text-base font-bold mb-4 flex items-center gap-2 text-slate-800">
+                                    Contas Fixas
+                                    <span className="text-xs font-normal text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{fixedExpenses.length}</span>
+                                </h2>
+                                
+                                <div className="flex-grow space-y-2 mb-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {fixedExpenses.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Nenhuma conta fixa.</p>}
+                                    {fixedExpenses.map(expense => (
+                                        <div key={expense.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all group">
+                                            <span className="text-slate-600 font-medium text-sm group-hover:text-slate-900">{expense.name}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-bold text-slate-800 text-sm">{formatCurrency(expense.amount)}</span>
+                                                <button onClick={() => removeFixedExpense(expense.id)} className="text-slate-300 hover:text-rose-500 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="trash" size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="flex flex-col gap-3">
+                                        <input type="text" placeholder="Nome (ex: Internet)" value={newExpenseName} onChange={(e) => setNewExpenseName(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" />
+                                        <div className="flex gap-2">
+                                            <input type="number" placeholder="Valor (R$)" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors" />
+                                            <button onClick={addFixedExpense} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 w-12 flex items-center justify-center shadow-lg shadow-indigo-100 transition-transform active:scale-95"><Icon name="plus" size={20} /></button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
