@@ -17,11 +17,6 @@
 
     <style>
         body { font-family: 'Inter', 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
-        /* Ajuste para input date/month ficar bonito */
-        input[type="month"] {
-            min-width: auto;
-            max-width: 100%;
-        }
         /* Custom Scrollbar for color picker */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
@@ -35,6 +30,15 @@
             .mobile-reverse-col {
                 flex-direction: column-reverse;
             }
+        }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
         }
     </style>
     <!-- Google Fonts Inter -->
@@ -103,6 +107,101 @@
         
         const PIX_COLOR = { name: 'Pix', class: 'bg-teal-500', text: 'text-teal-600', border: 'border-teal-200', light: 'bg-teal-50', ring: 'ring-teal-500' };
 
+        // --- Componente: Seletor de Mês/Ano (Header) ---
+        const MonthYearSelect = ({ value, onChange, className = "" }) => {
+            const [year, month] = value.split('-');
+            
+            const months = [
+                { val: '01', label: 'Janeiro' }, { val: '02', label: 'Fevereiro' },
+                { val: '03', label: 'Março' }, { val: '04', label: 'Abril' },
+                { val: '05', label: 'Maio' }, { val: '06', label: 'Junho' },
+                { val: '07', label: 'Julho' }, { val: '08', label: 'Agosto' },
+                { val: '09', label: 'Setembro' }, { val: '10', label: 'Outubro' },
+                { val: '11', label: 'Novembro' }, { val: '12', label: 'Dezembro' }
+            ];
+
+            const currentYear = new Date().getFullYear();
+            const years = Array.from({length: 11}, (_, i) => currentYear - 5 + i);
+
+            const handleMonthChange = (e) => onChange(`${year}-${e.target.value}`);
+            const handleYearChange = (e) => onChange(`${e.target.value}-${month}`);
+
+            return (
+                <div className={`flex gap-1 ${className}`}>
+                    <select 
+                        value={month} 
+                        onChange={handleMonthChange} 
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm min-w-[100px]"
+                    >
+                        {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+                    </select>
+                    <select 
+                        value={year} 
+                        onChange={handleYearChange} 
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm w-[80px]"
+                    >
+                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                </div>
+            );
+        };
+
+        // --- Componente: Input de Data Completa (Transação) ---
+        const DateInput = ({ value, onChange, className = "" }) => {
+            // Value format: YYYY-MM-DD
+            const [year, month, day] = value.split('-');
+
+            const months = [
+                { val: '01', label: 'Jan' }, { val: '02', label: 'Fev' },
+                { val: '03', label: 'Mar' }, { val: '04', label: 'Abr' },
+                { val: '05', label: 'Mai' }, { val: '06', label: 'Jun' },
+                { val: '07', label: 'Jul' }, { val: '08', label: 'Ago' },
+                { val: '09', label: 'Set' }, { val: '10', label: 'Out' },
+                { val: '11', label: 'Nov' }, { val: '12', label: 'Dez' }
+            ];
+
+            const handleDayChange = (e) => {
+                let d = e.target.value;
+                if (d > 31) d = 31;
+                // Não impede digitação, mas valida ao blur se precisar. Aqui vamos apenas atualizar.
+                onChange(`${year}-${month}-${d.padStart(2, '0')}`);
+            };
+
+            const handleMonthChange = (e) => onChange(`${year}-${e.target.value}-${day}`);
+            const handleYearChange = (e) => onChange(`${e.target.value}-${month}-${day}`);
+
+            return (
+                <div className={`flex gap-1 ${className}`}>
+                    <div className="relative w-[50px]">
+                        <input 
+                            type="number" 
+                            value={parseInt(day)} 
+                            onChange={handleDayChange}
+                            placeholder="Dia"
+                            min="1" max="31"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2.5 text-sm text-center font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm appearance-none"
+                        />
+                    </div>
+                    <select 
+                        value={month} 
+                        onChange={handleMonthChange} 
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm flex-1"
+                    >
+                        {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+                    </select>
+                    <div className="relative w-[65px]">
+                        <input 
+                            type="number" 
+                            value={year} 
+                            onChange={handleYearChange}
+                            placeholder="Ano"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2.5 text-sm text-center font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm appearance-none"
+                        />
+                    </div>
+                </div>
+            );
+        };
+
         const FinancialManager = () => {
             const loadInitialState = (key, defaultValue) => {
                 try {
@@ -114,6 +213,8 @@
             };
 
             const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
+            const getCurrentDateStr = () => new Date().toISOString().slice(0, 10);
+
             const [viewDate, setViewDate] = useState(getCurrentMonthStr()); 
 
             const [income, setIncome] = useState(() => loadInitialState('fin_income', 0)); 
@@ -145,7 +246,7 @@
             const [newCardExpenseValue, setNewCardExpenseValue] = useState('');
             const [newCardInstallments, setNewCardInstallments] = useState(1);
             const [selectedCardId, setSelectedCardId] = useState(''); 
-            const [newCardDate, setNewCardDate] = useState(getCurrentMonthStr()); 
+            const [newCardDate, setNewCardDate] = useState(getCurrentDateStr()); 
 
             const fileInputRef = useRef(null);
 
@@ -179,9 +280,13 @@
             };
 
             const getInstallmentInfo = (expense, currentViewDate) => {
-                const startDateStr = expense.firstInstallment || getCurrentMonthStr();
+                // expense.firstInstallment agora é YYYY-MM-DD
+                const startDateStr = expense.firstInstallment || getCurrentDateStr();
+                
+                // Pega os 2 primeiros itens (Ano e Mês) para o cálculo de parcelas
                 const [startYear, startMonth] = startDateStr.split('-').map(Number);
                 const [viewYear, viewMonth] = currentViewDate.split('-').map(Number);
+
                 const diffMonths = (viewYear - startYear) * 12 + (viewMonth - startMonth);
                 const currentInstallment = diffMonths + 1;
 
@@ -398,7 +503,7 @@
             return (
                 <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen font-sans pb-20">
                     
-                    {/* Header Moderno (Mobile Optimized) */}
+                    {/* Header */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-2 z-50 backdrop-blur-md bg-white/95">
                          <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="bg-indigo-600 p-2 md:p-3 rounded-xl shadow-indigo-200 shadow-lg text-white">
@@ -407,11 +512,10 @@
                             <div className="flex-1 md:flex-none">
                                 <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight leading-none">Financeiro</h1>
                                 <div className="flex items-center gap-2 text-slate-500 text-xs md:text-sm font-medium mt-1">
-                                    <input 
-                                        type="month" 
+                                    <span className="hidden md:inline">Visualizando:</span>
+                                    <MonthYearSelect 
                                         value={viewDate} 
-                                        onChange={(e) => setViewDate(e.target.value)} 
-                                        className="bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-slate-100 transition-colors"
+                                        onChange={setViewDate} 
                                     />
                                 </div>
                             </div>
@@ -440,7 +544,7 @@
                          </div>
                     </div>
 
-                    {/* Dashboard Grid - Responsivo */}
+                    {/* Dashboard Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
                         
                         {/* 1. Renda */}
@@ -534,7 +638,7 @@
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
                         
-                        {/* MAIN: Lançamentos (AGORA PRIMEIRO NO MOBILE via CSS Grid Order) */}
+                        {/* MAIN: Lançamentos */}
                         <div className="lg:col-span-8 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col order-1 lg:order-2">
                             <h2 className="text-base font-bold mb-4 md:mb-6 flex items-center gap-2 text-slate-800">
                                 Faturas & Saídas
@@ -593,11 +697,10 @@
                                         <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">
                                             {transactionType === 'pix' ? 'Data' : '1ª Parcela'}
                                         </label>
-                                        <input 
-                                            type="month" 
+                                        <DateInput 
                                             value={newCardDate} 
-                                            onChange={(e) => setNewCardDate(e.target.value)} 
-                                            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" 
+                                            onChange={setNewCardDate} 
+                                            className="w-full"
                                         />
                                     </div>
 
@@ -663,6 +766,13 @@
                                                 ? color.light + ' ' + color.text 
                                                 : info.status === 'paid' ? 'bg-slate-200 text-slate-500' : 'bg-blue-50 text-blue-600';
 
+                                            // Formata data da compra (se disponível) para mostrar no card
+                                            let dateDisplay = "";
+                                            if (expense.firstInstallment && expense.firstInstallment.length === 10) {
+                                                const [y, m, d] = expense.firstInstallment.split('-');
+                                                dateDisplay = `${d}/${m}`;
+                                            }
+
                                             return (
                                                 <div key={expense.id} className={`p-4 rounded-xl border relative group transition-all active:scale-[0.99] ${activeStyle}`}>
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -671,7 +781,10 @@
                                                                 {expense.cardId === 'pix' ? <Icon name="qr" size={16}/> : <span className="text-[10px] font-bold">{cardName.substring(0,2).toUpperCase()}</span>}
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-slate-800 font-bold text-sm line-clamp-1">{expense.description}</h4>
+                                                                <div className="flex items-center gap-2">
+                                                                    <h4 className="text-slate-800 font-bold text-sm line-clamp-1">{expense.description}</h4>
+                                                                    {dateDisplay && <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded">{dateDisplay}</span>}
+                                                                </div>
                                                                 <div className="flex items-center gap-2 mt-1">
                                                                     <span className="text-[10px] uppercase text-slate-500 font-medium tracking-wide line-clamp-1">{cardName}</span>
                                                                     <span className="text-slate-300">•</span>
@@ -711,7 +824,7 @@
                             </div>
                         </div>
 
-                        {/* SIDEBAR: Cadastros (AGORA SEGUNDO NO MOBILE) */}
+                        {/* SIDEBAR: Cadastros */}
                         <div className="lg:col-span-4 flex flex-col gap-6 md:gap-8 order-2 lg:order-1">
                             
                             {/* MEUS CARTÕES */}
